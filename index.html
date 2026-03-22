@@ -1082,18 +1082,17 @@
     }
     window.addEventListener('resize', resize);
 
-    // Draw frame — CONTAIN scaling so source pixels are never upscaled
-    // On a black page the letterbox bars are invisible
+    // Draw frame — cover-scale using actual frame dimensions
+    // Frames are 2560x1440; cover fills viewport edge-to-edge, crisp on all screens
     let currentFrame = 0;
     function drawFrame(idx) {
       const img = frames[idx];
       if (!img || !img.complete || !img.naturalWidth) return;
       const cw = window.innerWidth;
       const ch = window.innerHeight;
-      const iw = img.naturalWidth;
-      const ih = img.naturalHeight;
-      // contain: fit within viewport without upscaling past 1:1
-      const scale = Math.min(cw / iw, ch / ih, 1); // cap at 1 — never upscale
+      const iw = img.naturalWidth;   // 2560
+      const ih = img.naturalHeight;  // 1440
+      const scale = Math.max(cw / iw, ch / ih); // cover — fills viewport
       const dw = iw * scale;
       const dh = ih * scale;
       ctx.clearRect(0, 0, cw, ch);
