@@ -1054,7 +1054,7 @@
 <script>
   // ── SCROLL FILM ANIMATION ──
   (function () {
-    const TOTAL  = 212;
+    const TOTAL  = 192;
     const pad    = (n) => String(n).padStart(3, '0');
 
     const section   = document.getElementById('scrollFilm');
@@ -1066,22 +1066,36 @@
     const cueEl     = document.getElementById('filmScrollCue');
     if (!section || !canvas) return;
 
-    // Size canvas to full viewport
+    // Size canvas at physical pixels (fixes Retina/HiDPI blur)
+    const DPR = window.devicePixelRatio || 1;
     function resize() {
-      canvas.width  = window.innerWidth;
-      canvas.height = window.innerHeight;
+      const W = window.innerWidth;
+      const H = window.innerHeight;
+      // CSS size
+      canvas.style.width  = W + 'px';
+      canvas.style.height = H + 'px';
+      // Physical pixel size — critical for sharp rendering on Retina
+      canvas.width  = Math.round(W * DPR);
+      canvas.height = Math.round(H * DPR);
+      ctx.scale(DPR, DPR); // keep drawing coords in CSS pixels
       drawFrame(currentFrame);
     }
     window.addEventListener('resize', resize);
 
-    // Draw frame with cover-scale (no black bars)
+    // Draw frame — CONTAIN scaling so source pixels are never upscaled
+    // On a black page the letterbox bars are invisible
     let currentFrame = 0;
     function drawFrame(idx) {
       const img = frames[idx];
       if (!img || !img.complete || !img.naturalWidth) return;
-      const cw = canvas.width, ch = canvas.height;
-      const scale = Math.max(cw / 1280, ch / 720);
-      const dw = 1280 * scale, dh = 720 * scale;
+      const cw = window.innerWidth;
+      const ch = window.innerHeight;
+      const iw = img.naturalWidth;
+      const ih = img.naturalHeight;
+      // contain: fit within viewport without upscaling past 1:1
+      const scale = Math.min(cw / iw, ch / ih, 1); // cap at 1 — never upscale
+      const dw = iw * scale;
+      const dh = ih * scale;
       ctx.clearRect(0, 0, cw, ch);
       ctx.drawImage(img, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
     }
