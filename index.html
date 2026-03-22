@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI-Native Object Association — Oliv</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Mona+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300&display=swap" rel="stylesheet">
+<script type="module" src="https://unpkg.com/@splinetool/viewer@1.9.82/build/spline-viewer.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --black: #000000;
+    --deep: #060608;
+    --surface: #0c0c14;
+    --card: #111119;
+    --border: rgba(255,255,255,0.06);
+    --border-bright: rgba(255,255,255,0.11);
+    --purple: #7c6ff7;
+    --purple-glow: rgba(124,111,247,0.14);
+    --purple-faint: rgba(124,111,247,0.07);
+    --teal: #3ecfb2;
+    --amber: #f5a623;
+    --red: #e05c5c;
+    --white: #ffffff;
+    --muted: rgba(255,255,255,0.42);
+    --muted2: rgba(255,255,255,0.2);
+    --font: 'Mona Sans', system-ui, sans-serif;
+  }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--black);
+    color: var(--white);
+    font-family: var(--font);
+    font-size: 16px;
+    line-height: 1.6;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    padding: 20px 48px;
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(0,0,0,0.72);
+    backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+  .nav-logo-text { font-size: 17px; font-weight: 600; color: var(--white); letter-spacing: -0.3px; }
+  .nav-pill {
+    font-size: 11px; font-weight: 500; color: var(--purple);
+    background: var(--purple-faint);
+    border: 1px solid rgba(124,111,247,0.18);
+    padding: 4px 12px; border-radius: 20px;
+    letter-spacing: 0.5px; text-transform: uppercase;
+  }
+
+  section { position: relative; z-index: 1; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 48px; }
+  .section-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--purple);
+    margin-bottom: 16px; display: flex; align-items: center; gap: 10px;
+  }
+  .section-label::after { content: ''; height: 1px; width: 32px; background: var(--purple); opacity: 0.35; }
+  .section-title {
+    font-size: clamp(30px, 4vw, 46px); font-weight: 700;
+    letter-spacing: -1.5px; line-height: 1.1;
+    color: var(--white); margin-bottom: 16px;
+  }
+  .section-body { font-size: 17px; color: var(--muted); line-height: 1.75; }
+  .reveal { opacity: 0; transform: translateY(22px); transition: opacity 0.65s ease, transform 0.65s ease; }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+
+  /* ── HERO ── */
+  .hero {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    padding: 0;
+    overflow: hidden;
+    background: #000;
+  }
+
+  /* ── HERO MOUSE-FOLLOW GLOW ── */
+  .hero-cursor-glow {
+    position: absolute;
+    width: 800px; height: 800px;
+    border-radius: 50%;
+    background: radial-gradient(circle,
+      rgba(124,111,247,0.50) 0%,
+      rgba(110,90,245,0.28) 25%,
+      rgba(90,70,220,0.10) 55%,
+      transparent 72%);
+    filter: blur(32px);
+    pointer-events: none;
+    z-index: 1;
+    transform: translate(-50%, -50%);
+    transition: opacity 0.25s ease;
+    opacity: 0;
+    left: 50%; top: 50%;
+  }
+
+  .hero-inner {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    /* full viewport — no max-width cap so robot fills its column edge-to-edge */
+    padding: 0;
+    display: grid;
+    grid-template-columns: 42% 58%;
+    gap: 0;
+    align-items: stretch;
+    min-height: 100vh;
+  }
+
+  /* LEFT */
+  .hero-left {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 120px clamp(24px, 4vw, 56px) 80px clamp(32px, 7vw, 96px);
+  }
+
+  .hero-eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 11px; font-weight: 600;
+    color: var(--teal); letter-spacing: 1.4px; text-transform: uppercase;
+    margin-bottom: 32px;
+    opacity: 0; animation: fadeUp 0.6s ease forwards 0.2s;
+  }
+  .hero-eyebrow::before {
+    content: '';
+    display: block; width: 16px; height: 1px;
+    background: var(--teal); opacity: 0.6;
+  }
+
+  .hero-headline {
+    font-size: clamp(36px, 4.2vw, 58px);
+    font-weight: 700; line-height: 1.08;
+    letter-spacing: -2px; color: var(--white);
+    margin-bottom: 40px;
+    opacity: 0; animation: fadeUp 0.7s ease forwards 0.35s;
+  }
+  .hero-headline .accent {
+    background: linear-gradient(130deg, #a09af8 0%, #3ecfb2 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero-cta {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--purple); color: var(--white);
+    font-size: 14px; font-weight: 600;
+    padding: 14px 28px; border-radius: 8px;
+    text-decoration: none; letter-spacing: -0.2px;
+    transition: all 0.2s ease;
+    opacity: 0; animation: fadeUp 0.7s ease forwards 0.55s;
+  }
+  .hero-cta:hover { background: #8f84f9; transform: translateY(-1px); }
+
+  /* RIGHT — Spline 3D hero */
+  .hero-right {
+    position: relative;
+    /* stretch full grid row height = 100vh */
+    min-height: 100vh;
+    overflow: hidden;
+    opacity: 0;
+    animation: fadeIn 1s ease forwards 0.7s;
+  }
+
+  .spline-wrap {
+    position: absolute;
+    inset: 0;
+    /* extend slightly left so robot feels centred in the column */
+    left: -4%;
+    width: 108%;
+  }
+
+  spline-viewer {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    inset: 0;
+    --spline-background: transparent;
+    background: transparent !important;
+  }
+
+  /* Hide spline watermark/logo */
+  spline-viewer::part(logo) { display: none !important; }
+
+  /* ── GRAPH SECTION ── */
+  .graph-section { padding: 140px 0; position: relative; background: var(--black); }
+  .graph-section::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-bright), transparent);
+  }
+  .graph-header { text-align: center; margin-bottom: 72px; }
+  .graph-canvas { position: relative; width: 100%; max-width: 980px; margin: 0 auto; height: 520px; }
+  .graph-canvas svg { width: 100%; height: 100%; }
+  .source-node { opacity: 0; animation: popIn 0.45s ease forwards; }
+  .output-node { opacity: 0; animation: popIn 0.45s ease forwards; }
+  .center-orb { opacity: 0; animation: orbAppear 0.8s ease forwards 1.4s; }
+
+  /* ── PROBLEM SECTION ── */
+  .problem-section {
+    padding: 120px 0;
+    background: var(--black);
+    position: relative;
+  }
+  .problem-section::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-bright), transparent);
+  }
+  .problem-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 72px; }
+  .problem-card {
+    background: var(--card);
+    padding: 48px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+  }
+  .problem-card:hover {
+    border-color: var(--border-bright);
+    box-shadow: 0 0 0 1px rgba(124,111,247,0.1), 0 20px 40px -10px rgba(0,0,0,0.6);
+  }
+  .problem-card-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 1.2px;
+    text-transform: uppercase; margin-bottom: 24px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .problem-card-label.bad { color: var(--red); }
+  .problem-card-label.good { color: var(--teal); }
+  .problem-card-label .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .problem-card-label.bad .dot { background: var(--red); }
+  .problem-card-label.good .dot { background: var(--teal); }
+  .problem-card h3 { font-size: 21px; font-weight: 600; letter-spacing: -0.5px; margin-bottom: 16px; line-height: 1.3; }
+  .problem-card p { font-size: 15px; color: var(--muted); line-height: 1.75; }
+  .code-block {
+    margin-top: 28px;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 10px; padding: 20px 22px;
+    font-family: 'SF Mono','Fira Code',monospace;
+    font-size: 12.5px; line-height: 1.9;
+  }
+  .code-bad { color: var(--red); }
+  .code-comment { color: rgba(255,255,255,0.18); }
+  .code-good { color: var(--teal); }
+  .code-neutral { color: rgba(255,255,255,0.5); }
+
+  /* ── FAILURES SECTION ── */
+  .failures-section {
+    padding: 120px 0;
+    background: var(--deep);
+    position: relative;
+  }
+  .failures-section::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-bright), transparent);
+  }
+  .failures-intro { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: end; margin-bottom: 72px; }
+  .failures-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .failure-card {
+    background: var(--card);
+    padding: 48px; position: relative; overflow: hidden;
+    transition: border-color 0.25s ease, transform 0.25s ease;
+    border: 1px solid var(--border); border-radius: 16px;
+  }
+  .failure-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; width: 100%; height: 2px;
+    opacity: 0; transition: opacity 0.25s ease; border-radius: 16px 16px 0 0;
+  }
+  .failure-card:hover { border-color: var(--border-bright); transform: translateY(-3px); }
+  .failure-card:hover::before { opacity: 1; }
+  .failure-card:nth-child(1)::before { background: linear-gradient(90deg, var(--purple), transparent); }
+  .failure-card:nth-child(2)::before { background: linear-gradient(90deg, var(--teal), transparent); }
+  .failure-card:nth-child(3)::before { background: linear-gradient(90deg, var(--amber), transparent); }
+  .failure-card:nth-child(4)::before { background: linear-gradient(90deg, var(--red), transparent); }
+  .failure-num {
+    font-size: 11px; font-weight: 700; letter-spacing: 2px; color: var(--muted2);
+    margin-bottom: 20px; padding: 3px 10px;
+    background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+    border-radius: 6px; display: inline-block;
+  }
+  .failure-card h3 { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; margin-bottom: 14px; line-height: 1.35; }
+  .failure-card p { font-size: 14px; color: var(--muted); line-height: 1.75; }
+  .failure-quote {
+    margin-top: 24px; padding: 18px 20px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 10px;
+    border: 1px solid var(--border-bright);
+    position: relative;
+  }
+  .failure-quote::before {
+    content: '"';
+    position: absolute; top: -2px; left: 14px;
+    font-size: 40px; font-weight: 700; line-height: 1;
+    opacity: 0.09; font-family: Georgia, serif;
+  }
+  .failure-quote p { font-size: 13.5px; color: rgba(255,255,255,0.5); font-style: italic; line-height: 1.65; padding-top: 4px; }
+  .failure-quote .attribution { margin-top: 10px; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; font-style: normal; }
+  .failure-card:nth-child(1) .failure-quote { border-color: rgba(124,111,247,0.16); }
+  .failure-card:nth-child(1) .failure-quote .attribution { color: rgba(124,111,247,0.55); }
+  .failure-card:nth-child(2) .failure-quote { border-color: rgba(62,207,178,0.16); }
+  .failure-card:nth-child(2) .failure-quote .attribution { color: rgba(62,207,178,0.55); }
+  .failure-card:nth-child(3) .failure-quote { border-color: rgba(245,166,35,0.16); }
+  .failure-card:nth-child(3) .failure-quote .attribution { color: rgba(245,166,35,0.55); }
+  .failure-card:nth-child(4) .failure-quote { border-color: rgba(224,92,92,0.16); }
+  .failure-card:nth-child(4) .failure-quote .attribution { color: rgba(224,92,92,0.55); }
+
+  /* ── HOW SECTION ── */
+  .how-section { padding: 140px 0; background: var(--black); }
+  .how-section::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-bright), transparent);
+  }
+  .how-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 100px; align-items: start; margin-top: 64px; }
+  .how-steps { display: flex; flex-direction: column; }
+  .how-step {
+    display: flex; gap: 24px;
+    padding: 28px 0;
+    border-bottom: 1px solid var(--border);
+    transition: all 0.2s ease;
+  }
+  .how-step:first-child { padding-top: 0; }
+  .how-step:last-child { border-bottom: none; }
+  .how-step:hover .step-icon { background: var(--purple-glow); border-color: rgba(124,111,247,0.25); }
+  .step-icon {
+    flex-shrink: 0; width: 42px; height: 42px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s ease;
+  }
+  .step-icon svg { width: 17px; height: 17px; }
+  .step-text h4 { font-size: 15px; font-weight: 600; letter-spacing: -0.2px; margin-bottom: 6px; }
+  .step-text p { font-size: 14px; color: var(--muted); line-height: 1.7; }
+  .glass-card {
+    background: var(--card);
+    border: 1px solid var(--border-bright);
+    border-radius: 16px; padding: 36px;
+    position: relative; overflow: hidden;
+  }
+  .glass-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+  }
+  .glass-card-title { font-size: 11px; font-weight: 600; color: var(--muted2); letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 24px; }
+  .compare-row { display: flex; align-items: flex-start; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .compare-row:last-child { border-bottom: none; }
+  .compare-icon {
+    width: 20px; height: 20px; flex-shrink: 0; margin-top: 1px;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700;
+  }
+  .compare-icon.old { background: rgba(224,92,92,0.12); color: var(--red); }
+  .compare-icon.new { background: rgba(62,207,178,0.1); color: var(--teal); }
+  .compare-text { font-size: 14px; line-height: 1.65; color: var(--muted); }
+  .compare-text strong { color: var(--white); font-weight: 500; }
+
+  /* ── CTA SECTION ── */
+  .cta-section {
+    padding: 160px 48px;
+    text-align: center;
+    position: relative; overflow: hidden;
+    background: var(--deep);
+  }
+  .cta-section::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-bright), transparent);
+  }
+  .cta-glow {
+    position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 600px; height: 280px;
+    background: radial-gradient(ellipse at bottom, rgba(124,111,247,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .cta-section h2 {
+    font-size: clamp(34px, 5vw, 56px);
+    font-weight: 700; letter-spacing: -2px; line-height: 1.1;
+    max-width: 700px; margin: 0 auto 24px;
+  }
+  .cta-section p { font-size: 17px; color: var(--muted); max-width: 460px; margin: 0 auto 52px; line-height: 1.7; }
+  .cta-buttons { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; }
+  .btn-primary {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--purple); color: var(--white);
+    font-size: 15px; font-weight: 600;
+    padding: 16px 32px; border-radius: 10px;
+    text-decoration: none; letter-spacing: -0.2px;
+    transition: all 0.2s ease;
+  }
+  .btn-primary:hover { background: #8f84f9; transform: translateY(-1px); }
+  .btn-ghost {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: transparent; color: rgba(255,255,255,0.55);
+    font-size: 15px; font-weight: 500;
+    padding: 16px 28px; border-radius: 10px;
+    text-decoration: none; border: 1px solid var(--border-bright);
+    transition: all 0.2s ease;
+  }
+  .btn-ghost:hover { background: rgba(255,255,255,0.04); color: var(--white); }
+
+  /* ── FOOTER ── */
+  footer {
+    padding: 36px 48px;
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--black);
+  }
+  .footer-logo { font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.2); }
+  .footer-nav { display: flex; gap: 28px; }
+  .footer-nav a { font-size: 13px; color: rgba(255,255,255,0.2); text-decoration: none; transition: color 0.2s ease; }
+  .footer-nav a:hover { color: rgba(255,255,255,0.5); }
+
+  /* ── SPOTLIGHT CARD EFFECT (local coords — only hovered card glows) ── */
+  .problem-card[data-glow],
+  .failure-card[data-glow] {
+    /* default: no glow */
+    background-image: none;
+    transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease, background-image 0.1s ease;
+  }
+  .problem-card[data-glow]:hover {
+    background-color: #131320;
+    background-image: radial-gradient(
+      380px circle at var(--mx, -9999px) var(--my, -9999px),
+      rgba(124,111,247,0.18) 0%,
+      rgba(100,80,240,0.08) 45%,
+      transparent 70%
+    );
+    border-color: rgba(124,111,247,0.28);
+    box-shadow:
+      0 0 0 1px rgba(124,111,247,0.14),
+      0 20px 60px -12px rgba(80,60,200,0.35),
+      inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+  .failure-card[data-glow]:hover {
+    background-color: #131320;
+    background-image: radial-gradient(
+      380px circle at var(--mx, -9999px) var(--my, -9999px),
+      rgba(124,111,247,0.18) 0%,
+      rgba(100,80,240,0.08) 45%,
+      transparent 70%
+    );
+    border-color: rgba(124,111,247,0.28);
+    box-shadow:
+      0 0 0 1px rgba(124,111,247,0.14),
+      0 20px 60px -12px rgba(80,60,200,0.35),
+      inset 0 1px 0 rgba(255,255,255,0.06);
+    transform: translateY(-4px);
+  }
+
+  /* ── KEYFRAMES ── */
+  @keyframes fadeUp   { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes fadeIn   { from { opacity:0; } to { opacity:1; } }
+  @keyframes scrollDot{ 0%,100%{transform:translateX(-50%) translateY(0);opacity:1;} 50%{transform:translateX(-50%) translateY(6px);opacity:0.25;} }
+  @keyframes popIn    { from{opacity:0;transform:scale(0.88);} to{opacity:1;transform:scale(1);} }
+  @keyframes orbAppear{ from{opacity:0;transform:scale(0.75);} to{opacity:1;transform:scale(1);} }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 900px) {
+    .hero-inner { grid-template-columns: 1fr; min-height: auto; }
+    .hero-left { padding: 100px 24px 40px; text-align: center; align-items: center; }
+    .hero-right { min-height: 60vh; }
+    .spline-wrap { left: 0; width: 100%; }
+    .problem-grid,.failures-grid,.how-grid,.failures-intro { grid-template-columns: 1fr; }
+    nav,footer { padding: 16px 24px; }
+    .container { padding: 0 24px; }
+    .cta-section { padding: 100px 24px 80px; }
+  }
+  @media (max-width: 600px) {
+    .how-grid { gap: 48px; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="#" class="nav-logo">
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+      <circle cx="14" cy="14" r="13" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+      <circle cx="9.5" cy="14" r="5" fill="#7c6ff7"/>
+      <circle cx="18.5" cy="14" r="5" fill="#3ecfb2" opacity="0.75"/>
+      <circle cx="14" cy="14" r="3.5" fill="white"/>
+    </svg>
+    <span class="nav-logo-text">Oliv</span>
+  </a>
+  <span class="nav-pill">Technical Moat</span>
+</nav>
+
+<!-- 1. HERO -->
+<section class="hero" id="hero-section">
+
+  <!-- Mouse-follow purple glow -->
+  <div class="hero-cursor-glow" id="heroCursorGlow"></div>
+
+  <div class="hero-inner">
+    <!-- LEFT: Text -->
+    <div class="hero-left">
+      <div class="hero-eyebrow">AI-Native Object Association</div>
+      <h1 class="hero-headline">
+        Every signal from<br>every activity,<br>
+        <span class="accent">mapped to the right account.</span>
+      </h1>
+      <a href="#graph" class="hero-cta">
+        See how it works
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M3 7h8M7.5 3.5l4 3.5-4 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+    </div>
+
+    <!-- RIGHT: Spline 3D scene -->
+    <div class="hero-right">
+      <div class="spline-wrap">
+        <spline-viewer
+          url="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
+          background="transparent"
+        ></spline-viewer>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 2. OBJECT GRAPH -->
+<section class="graph-section" id="graph">
+  <div class="container">
+    <div class="graph-header reveal">
+      <div class="section-label" style="justify-content:center">The Object Graph</div>
+      <h2 class="section-title" style="text-align:center">Messy inputs.<br>Intelligent resolution.</h2>
+      <p class="section-body" style="text-align:center;margin:0 auto;max-width:520px">Raw signals from emails, calls, CRM, and Slack flow into Oliv and come out as clean, structured, connected objects your agents can act on.</p>
+    </div>
+    <div class="graph-canvas reveal" style="transition-delay:0.15s">
+      <svg viewBox="0 0 960 520" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="orbGrad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#b0a8f9"/>
+            <stop offset="45%" stop-color="#7c6ff7"/>
+            <stop offset="100%" stop-color="#3a2fac"/>
+          </radialGradient>
+          <radialGradient id="orbGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#7c6ff7" stop-opacity="0.22"/>
+            <stop offset="100%" stop-color="#7c6ff7" stop-opacity="0"/>
+          </radialGradient>
+          <linearGradient id="cG" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#141420"/>
+            <stop offset="100%" stop-color="#0e0e18"/>
+          </linearGradient>
+          <linearGradient id="cT" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#0a2420"/>
+            <stop offset="100%" stop-color="#071a17"/>
+          </linearGradient>
+          <linearGradient id="eL" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="rgba(124,111,247,0)"/>
+            <stop offset="100%" stop-color="rgba(124,111,247,0.5)"/>
+          </linearGradient>
+          <linearGradient id="eR" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="rgba(62,207,178,0.5)"/>
+            <stop offset="100%" stop-color="rgba(62,207,178,0)"/>
+          </linearGradient>
+          <filter id="gl"><feGaussianBlur stdDeviation="2.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+
+        <!-- Center orb -->
+        <circle cx="480" cy="260" r="88" fill="url(#orbGlow)" class="center-orb"/>
+        <circle cx="480" cy="260" r="55" fill="none" stroke="#7c6ff7" stroke-width="0.5" class="center-orb">
+          <animate attributeName="r" values="55;88;55" dur="3s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0.3;0;0.3" dur="3s" repeatCount="indefinite"/>
+        </circle>
+        <circle cx="480" cy="260" r="55" fill="none" stroke="#3ecfb2" stroke-width="0.4" class="center-orb">
+          <animate attributeName="r" values="55;92;55" dur="4.2s" repeatCount="indefinite" begin="1s"/>
+          <animate attributeName="opacity" values="0.18;0;0.18" dur="4.2s" repeatCount="indefinite" begin="1s"/>
+        </circle>
+        <g class="center-orb" style="animation-delay:1.4s">
+          <circle cx="480" cy="260" r="50" fill="url(#orbGrad)"/>
+          <circle cx="472" cy="260" r="11" fill="rgba(255,255,255,0.85)"/>
+          <circle cx="488" cy="260" r="11" fill="rgba(255,255,255,0.4)"/>
+          <circle cx="480" cy="260" r="7.5" fill="white"/>
+          <text x="480" y="322" text-anchor="middle" fill="rgba(255,255,255,0.35)" font-family="'Mona Sans',sans-serif" font-size="10.5" letter-spacing="1.2" font-weight="500">OLIV AI</text>
+        </g>
+
+        <!-- Labels -->
+        <text x="30" y="26" fill="rgba(255,255,255,0.18)" font-family="'Mona Sans',sans-serif" font-size="11" font-weight="500" letter-spacing="0.8">Raw signals</text>
+        <text x="700" y="26" fill="rgba(255,255,255,0.18)" font-family="'Mona Sans',sans-serif" font-size="11" font-weight="500" letter-spacing="0.8">Resolved objects</text>
+
+        <!-- Source nodes -->
+        <g class="source-node" style="animation-delay:0.1s">
+          <rect x="28" y="38" width="162" height="52" rx="10" fill="rgba(14,14,22,0.95)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+          <rect x="42" y="51" width="24" height="24" rx="5" fill="rgba(234,67,53,0.12)"/>
+          <text x="54" y="67" text-anchor="middle" fill="#ea4335" font-size="13" font-weight="700" font-family="sans-serif">M</text>
+          <text x="128" y="62" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-family="'Mona Sans',sans-serif" font-size="13" font-weight="500">Emails</text>
+          <text x="116" y="78" text-anchor="middle" fill="rgba(255,255,255,0.25)" font-family="'Mona Sans',sans-serif" font-size="11">danielle.k@acme.com</text>
+        </g>
+        <g class="source-node" style="animation-delay:0.22s">
+          <rect x="28" y="118" width="162" height="52" rx="10" fill="rgba(14,14,22,0.95)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+          <rect x="42" y="131" width="24" height="24" rx="5" fill="rgba(66,133,244,0.12)"/>
+          <text x="54" y="147" text-anchor="middle" fill="#4285f4" font-size="10" font-weight="600" font-family="sans-serif">CAL</text>
+          <text x="128" y="141" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-family="'Mona Sans',sans-serif" font-size="13" font-weight="500">Calendar</text>
+          <text x="120" y="157" text-anchor="middle" fill="rgba(255,255,255,0.25)" font-family="'Mona Sans',sans-serif" font-size="11">D. Keylam · Q1 QBR</text>
+        </g>
+        <g class="source-node" style="animation-delay:0.38s">
+          <rect x="28" y="198" width="162" height="52" rx="10" fill="rgba(14,14,22,0.95)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+          <rect x="42" y="211" width="24" height="24" rx="5" fill="rgba(0,161,224,0.12)"/>
+          <text x="54" y="227" text-anchor="middle" fill="#00a1e0" font-size="9" font-weight="700" font-family="sans-serif">CRM</text>
+          <text x="120" y="221" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-family="'Mona Sans',sans-serif" font-size="13" font-weight="500">CRM</text>
+          <text x="124" y="237" text-anchor="middle" fill="rgba(255,255,255,0.25)" font-family="'Mona Sans',sans-serif" font-size="11">Danielle Keylam, VP Eng</text>
+        </g>
+        <g class="source-node" style="animation-delay:0.52s">
+          <rect x="28" y="278" width="162" height="52" rx="10" fill="rgba(14,14,22,0.95)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+          <rect x="42" y="291" width="24" height="24" rx="5" fill="rgba(124,111,247,0.15)"/>
+          <text x="54" y="307" text-anchor="middle" fill="#9d94f8" font-size="12">🎙</text>
+          <text x="126" y="301" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-family="'Mona Sans',sans-serif" font-size="13" font-weight="500">Meeting</text>
+          <text x="122" y="317" text-anchor="middle" fill="rgba(255,255,255,0.25)" font-family="'Mona Sans',sans-serif" font-size="11">Danielle from Modern</text>
+        </g>
+        <g class="source-node" style="animation-delay:0.66s">
+          <rect x="28" y="358" width="162" height="52" rx="10" fill="rgba(14,14,22,0.95)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+          <rect x="42" y="371" width="24" height="24" rx="5" fill="rgba(224,29,90,0.1)"/>
+          <text x="54" y="387" text-anchor="middle" fill="#e01e5a" font-size="14" font-weight="700" font-family="sans-serif">#</text>
+          <text x="116" y="381" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-family="'Mona Sans',sans-serif" font-size="13" font-weight="500">Slack</text>
+          <text x="106" y="397" text-anchor="middle" fill="rgba(255,255,255,0.25)" font-family="'Mona Sans',sans-serif" font-size="11">@Danielle</text>
+        </g>
+
+        <!-- Edges left -->
+        <path d="M190 64 C310 64 355 195 430 230" stroke="url(#eL)" stroke-width="1" fill="none" stroke-dasharray="5 4" opacity="0.65">
+          <animate attributeName="stroke-dashoffset" from="100" to="0" dur="2s" repeatCount="indefinite"/>
+        </path>
+        <path d="M190 144 C295 144 350 200 430 240" stroke="url(#eL)" stroke-width="1" fill="none" stroke-dasharray="5 4" opacity="0.55">
+          <animate attributeName="stroke-dashoffset" from="100" to="0" dur="2.3s" repeatCount="indefinite" begin="0.3s"/>
+        </path>
+        <path d="M190 224 C285 224 360 242 428 252" stroke="url(#eL)" stroke-width="1" fill="none" stroke-dasharray="5 4" opacity="0.6">
+          <animate attributeName="stroke-dashoffset" from="100" to="0" dur="1.9s" repeatCount="indefinite" begin="0.5s"/>
+        </path>
+        <path d="M190 304 C282 304 355 272 430 268" stroke="url(#eL)" stroke-width="1" fill="none" stroke-dasharray="5 4" opacity="0.5">
+          <animate attributeName="stroke-dashoffset" from="100" to="0" dur="2.2s" repeatCount="indefinite" begin="0.8s"/>
+        </path>
+        <path d="M190 384 C300 384 355 310 430 280" stroke="url(#eL)" stroke-width="1" fill="none" stroke-dasharray="5 4" opacity="0.45">
+          <animate attributeName="stroke-dashoffset" from="100" to="0" dur="2.6s" repeatCount="indefinite" begin="0.4s"/>
+        </path>
+
+        <!-- Animated particles left -->
+        <circle r="3" fill="#7c6ff7" opacity="0.85" filter="url(#gl)" class="center-orb">
+          <animateMotion path="M190 64 C310 64 355 195 430 230" dur="2s" repeatCount="indefinite"/>
+        </circle>
+        <circle r="2.5" fill="#7c6ff7" opacity="0.65" filter="url(#gl)" class="center-orb">
+          <animateMotion path="M190 224 C285 224 360 242 428 252" dur="1.9s" repeatCount="indefinite" begin="0.5s"/>
+        </circle>
+        <circle r="2" fill="#7c6ff7" opacity="0.55" filter="url(#gl)" class="center-orb">
+          <animateMotion path="M190 384 C300 384 355 310 430 280" dur="2.5s" repeatCount="indefinite" begin="0.9s"/>
+        </circle>
+
+        <!-- Output nodes -->
+        <g class="output-node" style="animation-delay:1.8s">
+          <rect x="698" y="46" width="224" height="82" rx="12" fill="url(#cG)" stroke="rgba(124,111,247,0.22)" stroke-width="1"/>
+          <rect x="810" y="57" width="98" height="18" rx="9" fill="rgba(124,111,247,0.1)" stroke="rgba(124,111,247,0.22)" stroke-width="0.5"/>
+          <text x="859" y="69" text-anchor="middle" fill="#a09af8" font-family="'Mona Sans',sans-serif" font-size="10" font-weight="600" letter-spacing="0.5">Person</text>
+          <circle cx="722" cy="97" r="17" fill="rgba(124,111,247,0.15)" stroke="rgba(124,111,247,0.25)" stroke-width="1"/>
+          <text x="722" y="102" text-anchor="middle" fill="#a09af8" font-family="'Mona Sans',sans-serif" font-size="12" font-weight="600">DK</text>
+          <text x="820" y="93" text-anchor="middle" fill="rgba(255,255,255,0.82)" font-family="'Mona Sans',sans-serif" font-size="14" font-weight="600">Danielle Keylam</text>
+          <text x="810" y="111" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="'Mona Sans',sans-serif" font-size="12">VP Engineer</text>
+        </g>
+        <g class="output-node" style="animation-delay:2.0s">
+          <rect x="698" y="162" width="224" height="92" rx="12" fill="url(#cT)" stroke="rgba(62,207,178,0.22)" stroke-width="1"/>
+          <rect x="786" y="172" width="122" height="18" rx="9" fill="rgba(62,207,178,0.08)" stroke="rgba(62,207,178,0.22)" stroke-width="0.5"/>
+          <text x="847" y="184" text-anchor="middle" fill="#3ecfb2" font-family="'Mona Sans',sans-serif" font-size="10" font-weight="600" letter-spacing="0.5">Account</text>
+          <rect x="712" y="196" width="24" height="24" rx="5" fill="rgba(62,207,178,0.1)"/>
+          <text x="724" y="212" text-anchor="middle" fill="#3ecfb2" font-size="13">🏢</text>
+          <text x="824" y="203" text-anchor="middle" fill="rgba(255,255,255,0.82)" font-family="'Mona Sans',sans-serif" font-size="14" font-weight="600">Modern Moto</text>
+          <text x="808" y="221" text-anchor="middle" fill="#3ecfb2" font-family="'Mona Sans',sans-serif" font-size="11" font-style="italic">the customer</text>
+          <rect x="712" y="236" width="80" height="15" rx="7" fill="rgba(62,207,178,0.08)" stroke="rgba(62,207,178,0.15)" stroke-width="0.5"/>
+          <text x="752" y="247" text-anchor="middle" fill="#3ecfb2" font-family="'Mona Sans',sans-serif" font-size="10">Since Jan 2023</text>
+          <rect x="800" y="236" width="102" height="15" rx="7" fill="rgba(62,207,178,0.08)" stroke="rgba(62,207,178,0.15)" stroke-width="0.5"/>
+          <text x="851" y="247" text-anchor="middle" fill="#3ecfb2" font-family="'Mona Sans',sans-serif" font-size="10">ARR: $50,000</text>
+        </g>
+        <g class="output-node" style="animation-delay:2.2s">
+          <rect x="698" y="288" width="224" height="68" rx="12" fill="url(#cG)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+          <rect x="810" y="298" width="98" height="18" rx="9" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.07)" stroke-width="0.5"/>
+          <text x="859" y="310" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="'Mona Sans',sans-serif" font-size="10" font-weight="600" letter-spacing="0.5">Events</text>
+          <rect x="712" y="300" width="24" height="24" rx="5" fill="rgba(124,111,247,0.08)"/>
+          <text x="724" y="316" text-anchor="middle" fill="#9d94f8" font-size="12">📅</text>
+          <text x="810" y="314" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-family="'Mona Sans',sans-serif" font-size="14" font-weight="600">Q1 QBR</text>
+          <text x="800" y="332" text-anchor="middle" fill="rgba(255,255,255,0.25)" font-family="'Mona Sans',sans-serif" font-size="11">Jan 2024</text>
+        </g>
+        <g class="output-node" style="animation-delay:2.35s">
+          <rect x="698" y="390" width="224" height="78" rx="12" fill="url(#cG)" stroke="rgba(124,111,247,0.18)" stroke-width="1"/>
+          <rect x="810" y="400" width="98" height="18" rx="9" fill="rgba(124,111,247,0.1)" stroke="rgba(124,111,247,0.22)" stroke-width="0.5"/>
+          <text x="859" y="412" text-anchor="middle" fill="#a09af8" font-family="'Mona Sans',sans-serif" font-size="10" font-weight="600" letter-spacing="0.5">Person</text>
+          <circle cx="722" cy="436" r="17" fill="rgba(124,111,247,0.15)" stroke="rgba(124,111,247,0.22)" stroke-width="1"/>
+          <text x="722" y="441" text-anchor="middle" fill="#a09af8" font-family="'Mona Sans',sans-serif" font-size="12" font-weight="600">MJ</text>
+          <text x="812" y="431" text-anchor="middle" fill="rgba(255,255,255,0.82)" font-family="'Mona Sans',sans-serif" font-size="14" font-weight="600">Mike Johnson</text>
+          <text x="802" y="449" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="'Mona Sans',sans-serif" font-size="12">Account Exec</text>
+        </g>
+
+        <!-- Edges right -->
+        <path d="M530 242 C600 200 645 118 698 90" stroke="url(#eR)" stroke-width="1.2" fill="none" stroke-dasharray="5 4" opacity="0.75">
+          <animate attributeName="stroke-dashoffset" from="0" to="100" dur="2s" repeatCount="indefinite"/>
+        </path>
+        <path d="M532 260 C600 252 642 225 698 215" stroke="url(#eR)" stroke-width="1.2" fill="none" stroke-dasharray="5 4" opacity="0.85">
+          <animate attributeName="stroke-dashoffset" from="0" to="100" dur="1.9s" repeatCount="indefinite" begin="0.2s"/>
+        </path>
+        <path d="M532 270 C592 284 642 312 698 324" stroke="url(#eR)" stroke-width="1.2" fill="none" stroke-dasharray="5 4" opacity="0.65">
+          <animate attributeName="stroke-dashoffset" from="0" to="100" dur="2.3s" repeatCount="indefinite" begin="0.5s"/>
+        </path>
+        <path d="M530 284 C592 340 642 402 698 430" stroke="url(#eR)" stroke-width="1.2" fill="none" stroke-dasharray="5 4" opacity="0.55">
+          <animate attributeName="stroke-dashoffset" from="0" to="100" dur="2.6s" repeatCount="indefinite" begin="0.8s"/>
+        </path>
+
+        <!-- Animated particles right -->
+        <circle r="3" fill="#3ecfb2" opacity="0.85" filter="url(#gl)" class="center-orb">
+          <animateMotion path="M532 260 C600 252 642 225 698 215" dur="1.9s" repeatCount="indefinite" begin="0.3s"/>
+        </circle>
+        <circle r="2.5" fill="#3ecfb2" opacity="0.65" filter="url(#gl)" class="center-orb">
+          <animateMotion path="M532 270 C592 284 642 312 698 324" dur="2.3s" repeatCount="indefinite" begin="0.6s"/>
+        </circle>
+        <circle r="2" fill="#a09af8" opacity="0.75" filter="url(#gl)" class="center-orb">
+          <animateMotion path="M530 242 C600 200 645 118 698 90" dur="2s" repeatCount="indefinite" begin="0.4s"/>
+        </circle>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- 3. CORE PROBLEM -->
+<section class="problem-section">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-label">The Core Problem</div>
+      <h2 class="section-title">Every tool in the space does this wrong.</h2>
+      <p class="section-body" style="max-width:520px">The rule-based approach made sense in 2018. Your CRM is not that clean. Your pipeline is not that linear.</p>
+    </div>
+    <div class="problem-grid reveal" style="transition-delay:0.12s">
+      <div class="problem-card" data-glow>
+        <div class="problem-card-label bad"><span class="dot"></span>Industry standard</div>
+        <h3>Look up email. Find account. Find opportunity. Done.</h3>
+        <p>A static lookup. One email maps to one account maps to one opportunity. Clean in theory. Fails constantly in practice.</p>
+        <div class="code-block">
+          <div class="code-comment">// The rule-based path</div>
+          <div class="code-bad">email domain → account → opportunity[0]</div>
+          <div class="code-comment" style="margin-top:10px">// What actually happens</div>
+          <div class="code-bad">email → ??? (3 accounts match)</div>
+          <div class="code-bad">       ??? (2 opps open in same account)</div>
+          <div class="code-bad">       ??? (domain changed post-acquisition)</div>
+          <div class="code-bad">activity unmapped. data lost.</div>
+        </div>
+      </div>
+      <div class="problem-card" data-glow>
+        <div class="problem-card-label good"><span class="dot"></span>Oliv</div>
+        <h3>AI that reasons like your sharpest revenue team member would.</h3>
+        <p>Oliv looks at the full picture. All open accounts. All opportunities. Relationship history. Conversation context. It figures out where every activity belongs and writes clean data.</p>
+        <div class="code-block">
+          <div class="code-comment">// AI-native resolution</div>
+          <div class="code-good">activity → full context window</div>
+          <div class="code-good">  all accounts + all opportunities</div>
+          <div class="code-good">  acquisition graph lookup</div>
+          <div class="code-good">  recency + engagement signals</div>
+          <div class="code-neutral" style="margin-top:10px">correct object(s) mapped.</div>
+          <div class="code-neutral">CRM gets cleaner over time.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 4. WHERE OTHERS FAIL -->
+<section class="failures-section">
+  <div class="container">
+    <div class="failures-intro reveal">
+      <div>
+        <div class="section-label">Where others fail</div>
+        <h2 class="section-title">Four scenarios that break every rule-based system.</h2>
+      </div>
+      <p class="section-body">These are not edge cases. These are situations your revenue team runs into every week. Oliv handles all of them.</p>
+    </div>
+    <div class="failures-grid reveal" style="transition-delay:0.1s">
+
+      <div class="failure-card" data-glow>
+        <div class="failure-num">01</div>
+        <h3>Multiple opportunities open in the same account</h3>
+        <p>Your team is selling two products to the same company. Two separate opportunities, two different buying groups. A rule-based tool picks one and ignores the other. Activities get filed in the wrong place.</p>
+        <div class="failure-quote">
+          <p>I just got off a call with Salesforce but I have no idea which deal it logged against. We have three open there.</p>
+          <div class="attribution">Account Executive</div>
+        </div>
+      </div>
+
+      <div class="failure-card" data-glow>
+        <div class="failure-num">02</div>
+        <h3>One call covers multiple accounts</h3>
+        <p>A partner call where your rep discusses three different customer accounts in one conversation. Each account has its own opportunity. A rule-based tool sees one email address and logs everything to one account.</p>
+        <div class="failure-quote">
+          <p>We had a partner sync yesterday where we talked about five different customers. None of it showed up in the right places.</p>
+          <div class="attribution">Revenue Operations Manager</div>
+        </div>
+      </div>
+
+      <div class="failure-card" data-glow>
+        <div class="failure-num">03</div>
+        <h3>Company acquired, email domain changed</h3>
+        <p>You have an open opportunity under Company A. That company got acquired. The contact now emails from a Company B domain. The tool sees an unknown domain, finds no match, and drops the activity entirely.</p>
+        <div class="failure-quote">
+          <p>Our contact at Acme moved to NewCo after the acquisition. Now nothing maps and the whole account looks dead.</p>
+          <div class="attribution">Account Executive</div>
+        </div>
+      </div>
+
+      <div class="failure-card" data-glow>
+        <div class="failure-num">04</div>
+        <h3>Duplicate records and stale CRM data</h3>
+        <p>The same account exists twice in your CRM. One is active, one is a ghost. A rule-based tool picks one at random. Oliv looks at recency and engagement signals to find the live thread and cleans the duplicate as a byproduct.</p>
+        <div class="failure-quote">
+          <p>There are two accounts for the same company in Salesforce and nobody knows which one is real. We just pick one and hope.</p>
+          <div class="attribution">Sales Operations Lead</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- 5. THE MECHANISM -->
+<section class="how-section">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-label">The Mechanism</div>
+      <h2 class="section-title">How Oliv figures out<br>where every activity belongs.</h2>
+    </div>
+    <div class="how-grid">
+      <div class="how-steps reveal" style="transition-delay:0.05s">
+        <div class="how-step">
+          <div class="step-icon">
+            <svg viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="7" stroke="#7c6ff7" stroke-width="1.2"/><path d="M5.5 8.5l2 2 4-4" stroke="#7c6ff7" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="step-text">
+            <h4>Capture the full activity</h4>
+            <p>Every email, call, calendar event, Slack message. Captured as a rich context object with participants, content, and timestamps.</p>
+          </div>
+        </div>
+        <div class="how-step">
+          <div class="step-icon">
+            <svg viewBox="0 0 17 17" fill="none"><rect x="2" y="3" width="13" height="11" rx="2" stroke="#3ecfb2" stroke-width="1.2"/><path d="M5 7h7M5 10h4.5" stroke="#3ecfb2" stroke-width="1.2" stroke-linecap="round"/></svg>
+          </div>
+          <div class="step-text">
+            <h4>Pull every candidate object</h4>
+            <p>Not just the obvious email match. All open accounts, all opportunities, all contacts. Including acquisition adjacencies surfaced through live web research.</p>
+          </div>
+        </div>
+        <div class="how-step">
+          <div class="step-icon">
+            <svg viewBox="0 0 17 17" fill="none"><path d="M8.5 1.5L2 5.5v4.5c0 3 2.2 5.2 6.5 5.8 4.3-.6 6.5-2.8 6.5-5.8V5.5L8.5 1.5z" stroke="#f5a623" stroke-width="1.2" stroke-linejoin="round"/><path d="M6 8.5l2 2 3-3" stroke="#f5a623" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="step-text">
+            <h4>Reason through the full picture</h4>
+            <p>Oliv weighs every signal the way a senior revenue team member would. Recency, engagement history, conversation content, relationship context. Then determines the correct mapping.</p>
+          </div>
+        </div>
+        <div class="how-step">
+          <div class="step-icon">
+            <svg viewBox="0 0 17 17" fill="none"><path d="M3 8.5l3.5 3.5 7.5-7.5" stroke="#3ecfb2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="step-text">
+            <h4>Write clean data. No tickets raised.</h4>
+            <p>Activity lands in the right place. CRM is updated automatically. The messier your data, the more value Oliv creates. It cleans as it goes.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="reveal" style="transition-delay:0.18s">
+        <div class="glass-card">
+          <div class="glass-card-title">Oliv vs. Industry Standard</div>
+          <div class="compare-row">
+            <div class="compare-icon old">✕</div>
+            <div class="compare-text"><strong>Industry standard:</strong> one email, one account, one opportunity. Two open opps in the same account and the whole thing breaks.</div>
+          </div>
+          <div class="compare-row">
+            <div class="compare-icon new">✓</div>
+            <div class="compare-text"><strong>Oliv:</strong> scores every open opportunity in the account and maps the activity to the right one. Handles multi-opp accounts natively.</div>
+          </div>
+          <div class="compare-row">
+            <div class="compare-icon old">✕</div>
+            <div class="compare-text"><strong>Industry standard:</strong> one call, one account. Discussions about other accounts in the same call disappear entirely.</div>
+          </div>
+          <div class="compare-row">
+            <div class="compare-icon new">✓</div>
+            <div class="compare-text"><strong>Oliv:</strong> understands that a single call can span multiple accounts and maps accordingly across all of them.</div>
+          </div>
+          <div class="compare-row">
+            <div class="compare-icon old">✕</div>
+            <div class="compare-text"><strong>Industry standard:</strong> unknown domain means no match. Acquisition happens and your activity tracking goes dark.</div>
+          </div>
+          <div class="compare-row">
+            <div class="compare-icon new">✓</div>
+            <div class="compare-text"><strong>Oliv:</strong> runs live research to resolve domain adjacencies and corporate trees. Keeps the thread intact through any org change.</div>
+          </div>
+        </div>
+        <div class="glass-card" style="margin-top:14px;padding:28px 32px">
+          <p style="font-size:15px;color:rgba(255,255,255,0.65);line-height:1.72;font-style:italic">"The older way was a simple lookup. But that is not how a seller thinks. A seller looks at all their open accounts, thinks through context, and figures it out. Now AI can do that. That is exactly what we built."</p>
+          <div style="margin-top:14px;font-size:12px;color:var(--muted2);font-weight:600;letter-spacing:0.4px">Ishan, CEO, Oliv</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 6. CTA -->
+<section class="cta-section">
+  <div class="cta-glow"></div>
+  <div style="position:relative;z-index:2;max-width:860px;margin:0 auto">
+    <div class="section-label" style="justify-content:center;margin-bottom:24px">Ready to see it in action</div>
+    <h2>Stop buying tools that<br>can't read your CRM.</h2>
+    <p>Oliv works with your data exactly as it is. No cleanup sprint. No CRM audit. Just accurate activity mapping from day one.</p>
+    <div class="cta-buttons">
+      <a href="#" class="btn-primary">
+        Request a POV
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7h8M7.5 3.5l4 3.5-4 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <a href="#" class="btn-ghost">See the full platform</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-logo">Oliv · AI-Native Object Association</div>
+  <nav class="footer-nav">
+    <a href="#">Platform</a>
+    <a href="#">Context Capture</a>
+    <a href="#">SLM Architecture</a>
+    <a href="#">Contact</a>
+  </nav>
+</footer>
+
+<script>
+  // ── Scroll reveal ──
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.08, rootMargin: '0px 0px -24px 0px' });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  // ── Card spotlight — LOCAL coords so only hovered card glows ──
+  document.querySelectorAll('[data-glow]').forEach(el => {
+    el.addEventListener('pointermove', (e) => {
+      const r = el.getBoundingClientRect();
+      el.style.setProperty('--mx', (e.clientX - r.left).toFixed(1) + 'px');
+      el.style.setProperty('--my', (e.clientY - r.top).toFixed(1) + 'px');
+    });
+    el.addEventListener('pointerleave', () => {
+      el.style.setProperty('--mx', '-9999px');
+      el.style.setProperty('--my', '-9999px');
+    });
+  });
+
+  // ── Hero mouse-follow purple glow ──
+  const heroSection = document.getElementById('hero-section');
+  const cursorGlow  = document.getElementById('heroCursorGlow');
+
+  if (heroSection && cursorGlow) {
+    heroSection.addEventListener('pointermove', (e) => {
+      const r = heroSection.getBoundingClientRect();
+      const x = e.clientX - r.left;
+      const y = e.clientY - r.top;
+      cursorGlow.style.left    = x + 'px';
+      cursorGlow.style.top     = y + 'px';
+      cursorGlow.style.opacity = '1';
+    });
+    heroSection.addEventListener('pointerleave', () => {
+      cursorGlow.style.opacity = '0';
+    });
+  }
+</script>
+</body>
+</html>
